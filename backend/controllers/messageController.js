@@ -1,55 +1,53 @@
-import Conversation from "../Model/conversationModel.js";
-import Message from "../Model/messageModel.js";
+import Message from "../models/messageModel.js";
+import User from "../models/userModel.js";
+import Chat from "../models/chatModel.js";
 
 const sendMessage = async function(req, res){
     try{
-        const {message} = req.body;
-        const receiver = req.params.id;
+        const {chatId} = req.params;
+        const {content} = req.body;
         const sender = req.user._id;
 
-        let conversation = await Conversation.findOne({
-            participants: {$all: [sender, receiver]}
-        });
-        if(!conversation) {
-            conversation = await Conversation.create({
-                participants: [sender, receiver],
-            });
+        if(!content){
+            return res.status(400).json({error: "Message content cannot be empty"});
         }
 
-        const newMessage = await Message.create({
+        let message = await Message.create({
             sender,
-            receiver,
-            message,
+            content,
+            chat: chatId
+        });
+        // console.log(message);
+        message = await message.populate("sender", "username pic");
+        message = await message.populate("chat");
+        message = await User.populate(message, {
+            path: "chat.users",
+            select: "name pic email",
         });
 
-        if(newMessage){
-            conversation.messages.push(newMessage._id);
-            await conversation.save();
-        }
-        
-        res.status(201).json(newMessage);
+        await Chat.findByIdAndUpdate(chatId, {
+            latestMessage: message
+        });
 
-    } catch(e){
-        res.status(500).json({error: e});
+        res.status(200).json(message);
+
+    } catch(error){
+        res.status(500).json({error});
     }
 }
 
-const getMessages = async function(req, res){
+const fetchMessages = async function(req, res){
     try{
-        const {id: userToChatId} = req.params;
-        const sender = req.user._id;
-        const conversation = await Conversation.findOne({
-            participants: {$all: [sender, userToChatId]},
-        }).populate("messages");
+        const {chatId} = req.params;
+        let messages = await Message.find({chat: chatId}).populate("sender","username pic");
+        res.status(200).json(messages);
 
-        if(!conversation) return res.status(200).json([]);
-
-        res.status(200).json(conversation.messages);
-    } catch(e){
-        res.status(500).json({error: e});
+    } catch(error){
+        res.status(500).json(error);
     }
-}
+}  
 
 export {
-    sendMessage
+    sendMessage,
+    fetchMessages
 }

@@ -1,9 +1,9 @@
+import { sendMessage, fetchMessages } from "../controllers/messageController.js";
 import express from 'express';
-import protectRoute from '../middleware/protectRoute.js';
-import { sendMessage } from '../controllers/messageController.js';
+import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/send/:id", protectRoute, sendMessage)
+router.route('/:chatId').post(protect, sendMessage).get(protect, fetchMessages);
 
 export default router;
